@@ -1,22 +1,19 @@
-// Thin backend:
-// - Local dev: Vite's dev proxy + a simple Express server
-// - Production: Vercel serverless functions
-
 import Anthropic from "@anthropic-ai/sdk";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { systemPrompt, userMessage, model } = await req.json();
+  const { systemPrompt, userMessage, model } = req.body;
 
   if (!systemPrompt || !userMessage) {
-    return new Response("Missing required fields", { status: 400 });
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   const message = await client.messages.create({
@@ -30,7 +27,5 @@ export default async function handler(req: Request): Promise<Response> {
     message.content[0].type === "text" ? message.content[0].text : "";
   const tokens = message.usage.input_tokens + message.usage.output_tokens;
 
-  return new Response(JSON.stringify({ text, tokens }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  return res.status(200).json({ text, tokens });
 }
